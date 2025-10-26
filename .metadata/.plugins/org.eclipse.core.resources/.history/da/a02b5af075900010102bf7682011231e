@@ -1,0 +1,137 @@
+package com.servicefinder.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Service
+public class ChatService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(ChatService.class);
+    
+    @Value("${huggingface.api.token}")
+    private String huggingFaceToken;
+    
+    @Value("${huggingface.api.model:microsoft/DialoGPT-medium}")
+    private String modelName;
+    
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+    
+    // System prompt to ensure the chatbot stays as a support assistant
+    private static final String SYSTEM_PROMPT = """
+        You are ServeEase Customer Support Assistant, a helpful and polite AI assistant for the ServeEase platform.
+        
+        ServeEase is a local service provider platform where:
+        - Customers can register, search for services, book appointments, and rate service providers
+        - Service providers can register, create service listings, manage availability, and receive bookings
+        - Users can login/logout, manage their profiles, and view their booking history
+        
+        Your role is STRICTLY limited to:
+        ✅ Answering questions about ServeEase features and how to use the platform
+        ✅ Explaining the registration, login, booking, and rating processes
+        ✅ Providing general guidance on using the platform
+        ✅ Being helpful, polite, and professional
+        
+        You CANNOT and MUST NOT:
+        ❌ Make actual bookings or reservations
+        ❌ Access or modify user data
+        ❌ Process payments or transactions
+        ❌ Cancel or change existing bookings
+        ❌ Access real user information or booking details
+        ❌ Perform any actions that change data in the system
+        
+        Always remind users that for actual bookings, account changes, or data modifications, they need to use the ServeEase platform directly or contact human support.
+        
+        Keep responses concise, helpful, and focused on ServeEase platform guidance.
+        """;
+    
+    public ChatService() {
+        this.restTemplate = new RestTemplate();
+        this.objectMapper = new ObjectMapper();
+    }
+    
+    public String getChatResponse(String userMessage) {
+        try {
+            // Create the full prompt with system context
+            String fullPrompt = SYSTEM_PROMPT + "\n\nUser: " + userMessage + "\nAssistant:";
+            
+            // Prepare the request body for Hugging Face API
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("inputs", fullPrompt);
+            requestBody.put("parameters", Map.of(
+                "max_length", 200,
+                "temperature", 0.7,
+                "do_sample", true,
+                "pad_token_id", 50256
+            ));
+            
+            // Set up headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(huggingFaceToken);
+            
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+            
+            // Make the API call
+            String url = "https://api-inference.huggingface.co/models/" + modelName;
+            ResponseEntity<String> response = restTemplate.exchange(
+                url, 
+                HttpMethod.POST, 
+                entity, 
+                String.class
+            );
+            
+            // Parse the response
+            if (response.getStatusCode() == HttpStatus.OK) {
+                return parseHuggingFaceResponse(response.getBody());
+            } else {
+                logger.error("Hugging Face API returned status: {}", response.getStatusCode());
+                return getDefaultResponse();
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error calling Hugging Face API: ", e);
+            return getDefaultResponse();
+        }
+    }
+    
+    private String parseHuggingFaceResponse(String responseBody) {
+        try {
+            JsonNode jsonResponse = objectMapper.readTree(responseBody);
+            
+            if (jsonResponse.isArray() && jsonResponse.size() > 0) {
+                JsonNode firstResult = jsonResponse.get(0);
+                if (firstResult.has("generated_text")) {
+                    String generatedText = firstResult.get("generated_text").asText();
+                    
+                    // Extract only the assistant's response (after "Assistant:")
+                    String[] parts = generatedText.split("Assistant:");
+                    if (parts.length > 1) {
+                        return parts[parts.length - 1].trim();
+                    }
+                    return generatedText.trim();
+                }
+            }
+            
+            // If parsing fails, return default response
+            return getDefaultResponse();
+            
+        } catch (Exception e) {
+            logger.error("Error parsing Hugging Face response: ", e);
+            return getDefaultResponse();
+        }
+    }
+    
+    private String getDefaultResponse() {
+        return "Hello! I'm the ServeEase support assistant. I can help you with questions about our platform features like registration, booking services, managing your profile, and more. How can I assist you today?";
+    }
+} 

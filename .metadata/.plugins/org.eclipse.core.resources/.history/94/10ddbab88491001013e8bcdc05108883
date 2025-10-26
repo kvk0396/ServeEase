@@ -1,0 +1,125 @@
+package com.servicefinder.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import java.util.Map;
+
+@Service
+public class ChatService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ChatService.class);
+
+    @Value("${gemini.api.key}")
+    private String geminiApiKey;
+
+    @Value("${gemini.api.model:gemini-1.5-flash}")
+    private String modelName;
+
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+
+    private static final String SYSTEM_PROMPT = """
+        You are ServeEase Customer Support Assistant, a helpful and polite AI assistant for the ServeEase platform.
+
+        ServeEase is a local service provider platform where:
+        - Customers can register, search for services, book appointments, and rate service providers
+        - Service providers can register, create service listings, manage availability, and receive bookings
+        - Users can login/logout, manage their profiles, and view their booking history
+
+        Your role is STRICTLY limited to:
+        ✅ Answering questions about ServeEase features and how to use the platform
+        ✅ Explaining the registration, login, booking, and rating processes
+        ✅ Providing general guidance on using the platform
+        ✅ Being helpful, polite, and professional
+
+        You CANNOT and MUST NOT:
+        ❌ Make actual bookings or reservations
+        ❌ Access or modify user data
+        ❌ Process payments or transactions
+        ❌ Cancel or change existing bookings
+        ❌ Access real user information or booking details
+        ❌ Perform any actions that change data in the system
+
+        Always remind users that for actual bookings, account changes, or data modifications, they need to use the ServeEase platform directly or contact human support.
+
+        Keep responses concise, helpful, and focused on ServeEase platform guidance.
+        """;
+
+    public ChatService() {
+        this.restTemplate = new RestTemplate();
+        this.objectMapper = new ObjectMapper();
+    }
+
+    public String getChatResponse(String userMessage) {
+        try {
+            // Prepare request body for Gemini
+            Map<String, Object> content = Map.of(
+                    "parts", new Object[]{Map.of("text", SYSTEM_PROMPT + "\n\nUser: " + userMessage)}
+            );
+
+            Map<String, Object> requestBody = Map.of(
+                    "contents", new Object[]{content}
+            );
+
+            // Set headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+            // Gemini API URL
+            String url = "https://generativelanguage.googleapis.com/v1/models/"
+                    + modelName + ":generateContent?key=" + geminiApiKey;
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.POST,
+                    entity,
+                    String.class
+            );
+
+            if (response.getStatusCode() == HttpStatus.OK) {
+                return parseGeminiResponse(response.getBody());
+            } else {
+                logger.error("Gemini API returned status: {}", response.getStatusCode());
+                return getDefaultResponse();
+            }
+
+        } catch (Exception e) {
+            logger.error("Error calling Gemini API: ", e);
+            return getDefaultResponse();
+        }
+    }
+
+    private String parseGeminiResponse(String responseBody) {
+        try {
+            JsonNode jsonResponse = objectMapper.readTree(responseBody);
+
+            if (jsonResponse.has("candidates")) {
+                JsonNode candidate = jsonResponse.get("candidates").get(0);
+                if (candidate.has("content")) {
+                    JsonNode parts = candidate.get("content").get("parts");
+                    if (parts != null && parts.size() > 0 && parts.get(0).has("text")) {
+                        return parts.get(0).get("text").asText().trim();
+                    }
+                }
+            }
+
+            return getDefaultResponse();
+
+        } catch (Exception e) {
+            logger.error("Error parsing Gemini response: ", e);
+            return getDefaultResponse();
+        }
+    }
+
+    private String getDefaultResponse() {
+        return "Hello! I'm the ServeEase support assistant. I can help you with questions about our platform features like registration, booking services, managing your profile, and more. How can I assist you today?";
+    }
+}

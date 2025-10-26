@@ -1,0 +1,71 @@
+# # Server Configuration
+# server.port=8080
+
+# # Default profile (override with SPRING_PROFILES_ACTIVE=prod in Azure)
+# spring.profiles.active=dev
+
+# # H2 Database Configuration
+# spring.datasource.url=jdbc:h2:mem:serveease
+# spring.datasource.driverClassName=org.h2.Driver
+# spring.datasource.username=sa
+# spring.datasource.password=password
+
+# # H2 Console (for development)
+# spring.h2.console.enabled=true
+# spring.h2.console.path=/h2-console
+
+# # JPA Configuration
+# spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+# spring.jpa.hibernate.ddl-auto=create-drop
+
+# ===============================
+# MySQL Database Configuration
+# ===============================
+spring.datasource.url=jdbc:mysql://localhost:3306/serveease_db
+spring.datasource.username=root
+spring.datasource.password=kvk@123
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+# ===============================
+# JPA / Hibernate Configuration
+# ===============================
+spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect
+spring.jpa.hibernate.ddl-auto=update   
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# ===============================
+# Server / App Config (unchanged)
+# ===============================
+server.port=8080
+spring.profiles.active=dev
+
+# Logging Configuration
+logging.level.com.servicefinder=DEBUG
+logging.level.org.springframework.security=DEBUG
+logging.level.org.hibernate.SQL=DEBUG
+logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+
+# JWT Configuration
+jwt.secret=mySecretKeyForServeEaseApplicationThatIsLongEnoughFor256Bits
+jwt.expiration=86400000
+
+# Application Configuration
+app.name=ServeEase
+app.version=1.0.0
+
+# Swagger/OpenAPI Configuration
+springdoc.api-docs.path=/v3/api-docs
+springdoc.swagger-ui.path=/swagger-ui.html
+springdoc.swagger-ui.operationsSorter=method
+springdoc.swagger-ui.tagsSorter=alpha
+springdoc.swagger-ui.tryItOutEnabled=true 
+
+# CORS for local development (frontend runs on Vite dev server)
+cors.allowed-origins=http://localhost:5173
+
+# Hugging Face API Configuration
+# Get your free API token from: https://huggingface.co/settings/tokens
+# Gemini API Configuration
+gemini.api.key=AIzaSyBcIAM1xqz0NYNd80vea-NETilGmnRhW-4
+gemini.api.model=gemini-1.5-flash-latest

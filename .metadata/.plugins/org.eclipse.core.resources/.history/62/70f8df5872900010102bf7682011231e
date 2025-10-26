@@ -1,0 +1,5 @@
+package com.servicefinder.controller;
+
+public class ChatController {
+
+}

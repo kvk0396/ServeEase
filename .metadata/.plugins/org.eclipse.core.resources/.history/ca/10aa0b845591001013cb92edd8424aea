@@ -1,0 +1,151 @@
+package com.servicefinder.config;
+
+import com.servicefinder.security.CustomUserDetailsService;
+import com.servicefinder.security.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.http.HttpMethod;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
+public class SecurityConfig {
+
+    @Autowired
+    private CustomUserDetailsService userDetailsService;
+
+    @Autowired
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Value("${cors.allowed-origins:*}")
+    private String allowedOrigins;
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+        return authConfig.getAuthenticationManager();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf().disable()
+                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .and()
+                .authorizeHttpRequests(authz -> authz
+                        // Static frontend and SPA entrypoint
+                        .requestMatchers("/", "/index.html", "/favicon.ico", "/favicon.svg", "/serveease.svg").permitAll()
+                        .requestMatchers("/assets/**", "/static/**", "/css/**", "/js/**").permitAll()
+                        // Allow CORS preflight
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // Public endpoints (Swagger/Actuator)
+                        .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers("/swagger-ui/**").permitAll()
+                        .requestMatchers("/swagger-ui.html").permitAll()
+                        .requestMatchers("/v3/api-docs/**").permitAll()
+                        .requestMatchers("/swagger-resources/**").permitAll()
+                        .requestMatchers("/webjars/**").permitAll()
+                        // Same endpoints when the servlet path is /api
+                        .requestMatchers("/api/actuator/**").permitAll()
+                        .requestMatchers("/api/swagger-ui/**").permitAll()
+                        .requestMatchers("/api/swagger-ui.html").permitAll()
+                        .requestMatchers("/api/v3/api-docs/**").permitAll()
+                        .requestMatchers("/api/swagger-resources/**").permitAll()
+                        .requestMatchers("/api/webjars/**").permitAll()
+
+                        // Auth endpoints (support both default and /api prefix for tests vs prod)
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
+                        // H2 console (tests)
+                        .requestMatchers("/h2-console/**").permitAll()
+                        .requestMatchers("/api/h2-console/**").permitAll()
+
+                        // Service provider endpoints
+                        .requestMatchers("/api/service-providers/**").hasAnyRole("SERVICE_PROVIDER", "ADMIN")
+                        .requestMatchers("/api/services/**").hasAnyRole("SERVICE_PROVIDER", "ADMIN", "CUSTOMER")
+
+                        // Booking endpoints
+                        .requestMatchers("/api/bookings/**").hasAnyRole("CUSTOMER", "SERVICE_PROVIDER", "ADMIN")
+
+                        // Rating endpoints
+                        .requestMatchers("/api/ratings/**").hasAnyRole("CUSTOMER", "SERVICE_PROVIDER", "ADMIN")
+
+                        // Availability endpoints - allow customers to search, providers to manage
+                        .requestMatchers("/api/availability/search/**").permitAll()
+                        .requestMatchers("/api/availability/provider/{providerId}").permitAll()
+                        .requestMatchers("/api/availability/providers/**").permitAll()
+                        .requestMatchers("/api/availability/**").hasAnyRole("CUSTOMER", "SERVICE_PROVIDER", "ADMIN")
+                        .requestMatchers("/api/chat/**").permitAll()
+                        // Secure all remaining API calls
+                        .requestMatchers("/api/**").authenticated()
+
+                        // Allow all non-API GET requests (SPA routes)
+                        .requestMatchers(HttpMethod.GET, "/**").permitAll()
+
+                        // Everything else must be authenticated
+                        .anyRequest().authenticated()
+                )
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        // For H2 Console (development only)
+        http.headers().frameOptions().disable();
+
+        return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+        if (origins.isEmpty()) {
+            origins = List.of("*");
+        }
+        configuration.setAllowedOriginPatterns(origins);
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        // Only allow credentials when not using wildcard origins
+        boolean usesWildcard = origins.stream().anyMatch(o -> o.equals("*") || o.equals("*/*"));
+        configuration.setAllowCredentials(!usesWildcard);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+} 

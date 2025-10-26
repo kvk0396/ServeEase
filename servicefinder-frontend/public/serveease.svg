@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ServeEase logo">
+  <title>ServeEase</title>
+  <defs>
+    <linearGradient id="brand" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C73866" />
+      <stop offset="100%" stop-color="#FE676E" />
+    </linearGradient>
+    <linearGradient id="strokeG" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.85" />
+    </linearGradient>
+    <radialGradient id="nodeG" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="1" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.85" />
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect x="1.5" y="1.5" width="61" height="61" rx="14" fill="url(#brand)" />
+
+  <!-- Upper connector (customer) -->
+  <path d="M20 26 C 28 16, 36 16, 44 24" fill="none" stroke="url(#strokeG)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Lower connector (provider) -->
+  <path d="M20 38 C 28 48, 36 48, 44 40" fill="none" stroke="url(#strokeG)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Central link -->
+  <path d="M30 32 C 32.5 29, 35.5 29, 38 32" fill="none" stroke="url(#strokeG)" stroke-width="3.5" stroke-linecap="round" />
+
+  <!-- Nodes -->
+  <circle cx="16" cy="20" r="6.5" fill="rgba(255,255,255,0.22)" />
+  <circle cx="16" cy="20" r="4.5" fill="url(#nodeG)" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="1.5" />
+
+  <circle cx="48" cy="44" r="6.5" fill="rgba(255,255,255,0.22)" />
+  <circle cx="48" cy="44" r="4.5" fill="url(#nodeG)" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="1.5" />
+</svg> 

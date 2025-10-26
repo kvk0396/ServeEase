@@ -1,0 +1,5 @@
+package com.servicefinder.dto;
+
+public class ChatRequest {
+
+}
